@@ -1,5 +1,5 @@
 // Ganti URL di bawah ini dengan URL hasil Deploy Google Apps Script Anda
-const GOOGLE_SCRIPT_URL = "URL_GOOGLE_APPS_SCRIPT_ANDA_DI_SINI";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwSovopdoaQft-w2aCbrucFblIV_w69UQd_JmoTUobp-FLXQXOOX4Hbxfrs8E76i7c/exec";
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
