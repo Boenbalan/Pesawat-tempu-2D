@@ -163,8 +163,8 @@
 </div>
 
 <script>
-    // MASUKKAN URL GOOGLE APPS SCRIPT ANDA DI SINI
-    const GOOGLE_SCRIPT_URL = "GANTI_DENGAN_URL_WEB_APP_ANDA";
+    // URL Google Apps Script milik Anda
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbziBPDk0_2quIHFh1S1nGUCVBnb47mSOmCA8brDmnlMP6Y4Va0R_qvegu1xHxqMOdh1ug/exec";
 
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
@@ -471,8 +471,6 @@
 
     // Google Sheets Integration Functions
     function saveScoreToGoogleSheets(nama, skor) {
-        if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("GANTI_DENGAN")) return;
-
         fetch(GOOGLE_SCRIPT_URL, {
             method: "POST",
             mode: "no-cors",
@@ -484,11 +482,6 @@
     }
 
     function fetchLeaderboard() {
-        if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("GANTI_DENGAN")) {
-            document.getElementById("leaderboard-list").innerHTML = "<small>URL Google Script Belum Dikonfigurasi.</small>";
-            return;
-        }
-
         fetch(GOOGLE_SCRIPT_URL)
             .then(res => res.json())
             .then(data => {
