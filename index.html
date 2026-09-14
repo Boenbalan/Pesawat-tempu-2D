@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Modern Air Fighter 2D</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #050510;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .ui-panel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(5, 5, 16, 0.85);
+            backdrop-filter: blur(8px);
+            color: #fff;
+            z-index: 10;
+        }
+        h1 {
+            font-size: 2.5rem;
+            color: #00f0ff;
+            text-shadow: 0 0 15px #00f0ff;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        p {
+            color: #aaa;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        input[type="text"] {
+            padding: 12px 20px;
+            border-radius: 25px;
+            border: 2px solid #00f0ff;
+            background: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            font-size: 1rem;
+            text-align: center;
+            outline: none;
+            margin-bottom: 20px;
+            width: 250px;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+        }
+        button {
+            padding: 12px 35px;
+            border: none;
+            border-radius: 25px;
+            background: linear-gradient(45deg, #00f0ff, #7000ff);
+            color: #fff;
+            font-weight: bold;
+            font-size: 1.1rem;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        #leaderboard {
+            margin-top: 25px;
+            width: 80%;
+            max-width: 350px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        #leaderboard h3 {
+            text-align: center;
+            color: #ff007f;
+            margin-bottom: 10px;
+        }
+        .score-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 0.85rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            color: #fff;
+            font-size: 1.2rem;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 5;
+            text-shadow: 0 0 5px #000;
+        }
+        .hp-bar {
+            width: 100px;
+            height: 12px;
+            background: rgba(255, 0, 0, 0.3);
+            border: 1px solid #ff0055;
+            border-radius: 6px;
+            overflow: hidden;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .hp-fill {
+            width: 100%;
+            height: 100%;
+            background: #ff0055;
+            box-shadow: 0 0 8px #ff0055;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="hud">
+        <div>SCORE: <span id="score-val" style="color: #00f0ff;">0</span></div>
+        <div>HP: <div class="hp-bar"><div id="hp-val" class="hp-fill"></div></div></div>
+    </div>
+
+    <!-- Start / Game Over Overlay -->
+    <div id="overlay" class="ui-panel">
+        <h1 id="title-text">AIR FIGHTER 2D</h1>
+        <p id="sub-text">Gunakan Mouse / Touch Drag untuk Bergerak</p>
+        
+        <input type="text" id="player-name" placeholder="Masukkan Nama Anda" maxlength="12">
+        <button id="start-btn" onclick="startGame()">START GAME</button>
+
+        <div id="leaderboard">
+            <h3>TOP 5 LEADERBOARD</h3>
+            <div id="leaderboard-list">Memuat data...</div>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+</div>
+
+<script>
+    // MASUKKAN URL GOOGLE APPS SCRIPT ANDA DI SINI
+    const GOOGLE_SCRIPT_URL = "GANTI_DENGAN_URL_WEB_APP_ANDA";
+
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let width, height;
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    // Game State
+    let isPlaying = false;
+    let score = 0;
+    let frame = 0;
+
+    // Entities
+    let player, bullets, enemies, particles, stars;
+
+    class Player {
+        constructor() {
+            this.x = width / 2;
+            this.y = height - 100;
+            this.size = 24;
+            this.hp = 100;
+            this.maxHp = 100;
+            this.targetX = this.x;
+            this.targetY = this.y;
+        }
+        draw() {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+
+            // Exhaust Glow & Flame
+            ctx.fillStyle = "#00f0ff";
+            ctx.beginPath();
+            ctx.arc(0, 20 + Math.random() * 5, 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Ship Body (Modern Cyber jet)
+            ctx.fillStyle = "#ffffff";
+            ctx.shadowColor = "#00f0ff";
+            ctx.shadowBlur = 15;
+            
+            ctx.beginPath();
+            ctx.moveTo(0, -this.size * 1.5);
+            ctx.lineTo(-this.size, this.size);
+            ctx.lineTo(0, this.size * 0.6);
+            ctx.lineTo(this.size, this.size);
+            ctx.closePath();
+            ctx.fill();
+
+            // Wings Details
+            ctx.fillStyle = "#00f0ff";
+            ctx.fillRect(-this.size / 2, 0, this.size, 4);
+
+            ctx.restore();
+        }
+        update() {
+            // Smooth movement interpolation
+            this.x += (this.targetX - this.x) * 0.15;
+            this.y += (this.targetY - this.y) * 0.15;
+
+            // Boundaries
+            this.x = Math.max(this.size, Math.min(width - this.size, this.x));
+            this.y = Math.max(this.size, Math.min(height - this.size, this.y));
+
+            // Auto shoot
+            if (frame % 8 === 0) {
+                bullets.push(new Bullet(this.x - 12, this.y - 15));
+                bullets.push(new Bullet(this.x + 12, this.y - 15));
+            }
+        }
+    }
+
+    class Bullet {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.speed = 14;
+            this.radius = 3;
+        }
+        draw() {
+            ctx.save();
+            ctx.fillStyle = "#00f0ff";
+            ctx.shadowColor = "#00f0ff";
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+        update() {
+            this.y -= this.speed;
+        }
+    }
+
+    class Enemy {
+        constructor() {
+            this.x = Math.random() * (width - 40) + 20;
+            this.y = -40;
+            this.size = 18;
+            this.speed = 2 + Math.random() * 3;
+            this.hp = 2;
+            this.color = "#ff0055";
+        }
+        draw() {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.fillStyle = this.color;
+            ctx.shadowColor = this.color;
+            ctx.shadowBlur = 10;
+
+            ctx.beginPath();
+            ctx.moveTo(0, this.size * 1.2);
+            ctx.lineTo(-this.size, -this.size * 0.8);
+            ctx.lineTo(0, -this.size * 0.3);
+            ctx.lineTo(this.size, -this.size * 0.8);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+        update() {
+            this.y += this.speed;
+        }
+    }
+
+    class Particle {
+        constructor(x, y, color) {
+            this.x = x;
+            this.y = y;
+            this.color = color;
+            this.vx = (Math.random() - 0.5) * 6;
+            this.vy = (Math.random() - 0.5) * 6;
+            this.life = 1;
+            this.decay = 0.03 + Math.random() * 0.03;
+            this.size = Math.random() * 4 + 1;
+        }
+        draw() {
+            ctx.save();
+            ctx.globalAlpha = this.life;
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.life -= this.decay;
+        }
+    }
+
+    // Controls setup (Mouse & Touch)
+    function handleMove(e) {
+        if (!player) return;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        player.targetX = clientX;
+        player.targetY = clientY - 30; // Sedikit offset di atas jari/kursor
+    }
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("touchmove", handleMove, { passive: true });
+
+    // Background Stars Setup
+    stars = Array.from({ length: 60 }, () => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        speed: Math.random() * 3 + 0.5,
+        size: Math.random() * 2
+    }));
+
+    function initGame() {
+        player = new Player();
+        bullets = [];
+        enemies = [];
+        particles = [];
+        score = 0;
+        frame = 0;
+        updateHUD();
+    }
+
+    function updateHUD() {
+        document.getElementById("score-val").innerText = score;
+        const hpPercent = Math.max(0, (player.hp / player.maxHp) * 100);
+        document.getElementById("hp-val").style.width = hpPercent + "%";
+    }
+
+    function createExplosion(x, y, color = "#ff0055", count = 15) {
+        for (let i = 0; i < count; i++) {
+            particles.push(new Particle(x, y, color));
+        }
+    }
+
+    function startGame() {
+        const nameInput = document.getElementById("player-name").value.trim();
+        if (!nameInput) {
+            alert("Harap masukkan nama terlebih dahulu!");
+            return;
+        }
+        document.getElementById("overlay").style.display = "none";
+        initGame();
+        isPlaying = true;
+    }
+
+    function gameOver() {
+        isPlaying = false;
+        const playerName = document.getElementById("player-name").value.trim();
+        
+        document.getElementById("title-text").innerText = "GAME OVER";
+        document.getElementById("sub-text").innerText = `Skor Akhir: ${score}`;
+        document.getElementById("start-btn").innerText = "MAIN LAGI";
+        document.getElementById("overlay").style.display = "flex";
+
+        // Kirim skor ke Google Sheets
+        saveScoreToGoogleSheets(playerName, score);
+    }
+
+    // Main Game Loop
+    function loop() {
+        requestAnimationFrame(loop);
+
+        // Clear Screen
+        ctx.fillStyle = "rgba(5, 5, 16, 0.4)";
+        ctx.fillRect(0, 0, width, height);
+
+        // Draw & Update Starfield
+        ctx.fillStyle = "#ffffff";
+        stars.forEach(star => {
+            ctx.fillRect(star.x, star.y, star.size, star.size);
+            star.y += star.speed;
+            if (star.y > height) star.y = 0;
+        });
+
+        if (!isPlaying) return;
+
+        frame++;
+
+        // Spawn Enemies
+        if (frame % 35 === 0) {
+            enemies.push(new Enemy());
+        }
+
+        // Update & Draw Player
+        player.update();
+        player.draw();
+
+        // Update Bullets
+        bullets.forEach((b, i) => {
+            b.update();
+            b.draw();
+            if (b.y < -10) bullets.splice(i, 1);
+        });
+
+        // Update Particles
+        particles.forEach((p, i) => {
+            p.update();
+            p.draw();
+            if (p.life <= 0) particles.splice(i, 1);
+        });
+
+        // Update Enemies & Collisions
+        enemies.forEach((e, ei) => {
+            e.update();
+            e.draw();
+
+            // Collision: Bullet vs Enemy
+            bullets.forEach((b, bi) => {
+                const dist = Math.hypot(b.x - e.x, b.y - e.y);
+                if (dist < e.size + b.radius) {
+                    createExplosion(b.x, b.y, "#00f0ff", 5);
+                    bullets.splice(bi, 1);
+                    e.hp--;
+                    if (e.hp <= 0) {
+                        createExplosion(e.x, e.y, "#ff0055", 15);
+                        enemies.splice(ei, 1);
+                        score += 100;
+                        updateHUD();
+                    }
+                }
+            });
+
+            // Collision: Player vs Enemy
+            const playerDist = Math.hypot(player.x - e.x, player.y - e.y);
+            if (playerDist < player.size + e.size) {
+                createExplosion(e.x, e.y, "#ffaa00", 20);
+                enemies.splice(ei, 1);
+                player.hp -= 25;
+                updateHUD();
+                if (player.hp <= 0) {
+                    gameOver();
+                }
+            }
+
+            // Remove Out of Screen
+            if (e.y > height + 50) {
+                enemies.splice(ei, 1);
+            }
+        });
+    }
+
+    // Google Sheets Integration Functions
+    function saveScoreToGoogleSheets(nama, skor) {
+        if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("GANTI_DENGAN")) return;
+
+        fetch(GOOGLE_SCRIPT_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nama: nama, skor: skor })
+        }).then(() => {
+            setTimeout(fetchLeaderboard, 1500); // Reload Leaderboard setelah kirim
+        }).catch(err => console.error("Error saving score:", err));
+    }
+
+    function fetchLeaderboard() {
+        if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("GANTI_DENGAN")) {
+            document.getElementById("leaderboard-list").innerHTML = "<small>URL Google Script Belum Dikonfigurasi.</small>";
+            return;
+        }
+
+        fetch(GOOGLE_SCRIPT_URL)
+            .then(res => res.json())
+            .then(data => {
+                let html = "";
+                data.slice(0, 5).forEach((row, idx) => {
+                    html += `<div class="score-row">
+                        <span>#${idx + 1} ${row[0]}</span>
+                        <span style="color:#00f0ff;">${row[1]} pts</span>
+                    </div>`;
+                });
+                document.getElementById("leaderboard-list").innerHTML = html || "Belum ada skor.";
+            })
+            .catch(() => {
+                document.getElementById("leaderboard-list").innerHTML = "<small>Gagal memuat skor.</small>";
+            });
+    }
+
+    // Init
+    loop();
+    fetchLeaderboard();
+</script>
+</body>
+</html>
